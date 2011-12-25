@@ -1,15 +1,15 @@
 #!/bin/sh
-
 if [ 'firewall' = $HOTPLUG_TYPE ]; then
 	. /etc/functions.sh
 	config_load firewall
-	cfg=$(set | egrep "cfg[0-9a-f]+_network=(('| )${INTERFACE}( |'))" | cut -f2 -d_)
-	if [ "$(uci get firewall.$cfg.masq)" = '1' ] ; then
+	cfg=$(set | egrep "cfg[0-9a-f]+_network=.*(('| )${INTERFACE}( |'))" | cut -f2 -d_)
+	if [ '1' = "$(uci get firewall.$cfg.masq)" ] ; then
+		zone=$(uci get firewall.${cfg}.name)
 		ipaddr=$(uci -P /var/state get network.${INTERFACE}.ipaddr)
 		case "$ACTION" in
 			add) op=-I ;;
 			remove) op=-D ;;
 		esac
-		iptables -t nat $op zone_wan_nat -o $DEVICE -j SNAT --to-source $ipaddr
+		iptables -t nat $op zone_${zone}_nat -o $DEVICE -j SNAT --to-source $ipaddr
 	fi
 fi
