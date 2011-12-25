@@ -1,0 +1,4 @@
+This repo contains various fixes that enhance my OpenWRT build
+
+* dual-wan: scripts that enable dual-wan routing, load-balancing and NAT
+* httpd: "200 OK"+Range: patch for busybox httpd and some scripts, f.e. index.cgi does directroy listing
