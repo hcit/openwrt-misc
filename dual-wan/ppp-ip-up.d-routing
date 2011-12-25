@@ -1,5 +1,4 @@
-#!/bin/sh -x
-exec >& /www/cache/ppp_route.log
+#!/bin/sh
 iface=$1
 addr=$4
 gw=$5

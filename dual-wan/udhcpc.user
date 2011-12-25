@@ -1,5 +1,4 @@
 #!/bin/sh
-set > /tmp/udhcpc.log
 name=wan_ks
 rt=$name
 
