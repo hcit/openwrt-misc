@@ -1,0 +1,46 @@
+diff -Naur busybox-1.19.3.orig/networking/httpd.c busybox-1.19.3/networking/httpd.c
+--- busybox-1.19.3.orig/networking/httpd.c	2011-11-17 01:37:06.000000000 +0300
++++ busybox-1.19.3/networking/httpd.c	2011-11-17 01:40:45.000000000 +0300
+@@ -292,6 +292,7 @@
+ 	off_t range_start;
+ 	off_t range_end;
+ 	off_t range_len;
++	smallint range_present;
+ #endif
+ 
+ #if ENABLE_FEATURE_HTTPD_BASIC_AUTH
+@@ -343,6 +344,7 @@
+ #define range_start       (G.range_start      )
+ #define range_end         (G.range_end        )
+ #define range_len         (G.range_len        )
++#define range_present     (G.range_present    )
+ #else
+ enum {
+ 	range_start = 0,
+@@ -1658,7 +1660,7 @@
+ 		range_start = 0;
+ 	}
+ 	range_len = MAXINT(off_t);
+-	if (range_start) {
++	if (range_start || range_present) {
+ 		if (!range_end) {
+ 			range_end = file_size - 1;
+ 		}
+@@ -1888,6 +1890,9 @@
+ #endif
+ 	xchdir(home_httpd);
+ 
++#if ENABLE_FEATURE_HTTPD_RANGES
++	range_present=0;
++#endif
+ 	/* Allocation of iobuf is postponed until now
+ 	 * (IOW, server process doesn't need to waste 8k) */
+ 	iobuf = xmalloc(IOBUF_SIZE);
+@@ -2123,6 +2128,7 @@
+ 			if (STRNCASECMP(iobuf, "Range:") == 0) {
+ 				/* We know only bytes=NNN-[MMM] */
+ 				char *s = skip_whitespace(iobuf + sizeof("Range:")-1);
++				range_present=1;
+ 				if (strncmp(s, "bytes=", 6) == 0) {
+ 					s += sizeof("bytes=")-1;
+ 					range_start = BB_STRTOOFF(s, &s, 10);
