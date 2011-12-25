@@ -1,0 +1,15 @@
+#!/bin/sh
+
+if [ 'firewall' = $HOTPLUG_TYPE ]; then
+	. /etc/functions.sh
+	config_load firewall
+	cfg=$(set | egrep "cfg[0-9a-f]+_network=(('| )${INTERFACE}( |'))" | cut -f2 -d_)
+	if [ "$(uci get firewall.$cfg.masq)" = '1' ] ; then
+		ipaddr=$(uci -P /var/state get network.${INTERFACE}.ipaddr)
+		case "$ACTION" in
+			add) op=-I ;;
+			remove) op=-D ;;
+		esac
+		iptables -t nat $op zone_wan_nat -o $DEVICE -j SNAT --to-source $ipaddr
+	fi
+fi

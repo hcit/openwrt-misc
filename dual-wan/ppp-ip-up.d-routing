@@ -1,0 +1,18 @@
+#!/bin/sh -x
+exec >& /www/cache/ppp_route.log
+iface=$1
+addr=$4
+gw=$5
+rt=$6
+ip route add $gw dev $iface src $addr table $rt
+ip route add 0.0.0.0/0 via $gw dev $iface table $rt
+pref=$(sed -n -e "/$rt/ { s/[[:space:]].*//; p; q;}" < /etc/iproute2/rt_tables)
+if [ "$pref" ]; then
+	ip rule del pref $pref
+	ip rule add from $addr pref $pref table $rt
+fi
+
+other_gw=$(ip r l table wan_ks | grep default | cut -f 2- -d " ")
+ip r add default dev $iface metric 20
+[ "$other_gw" ] && ip r add default scope global nexthop dev $iface weight 5 nexthop $other_gw weight 10
+ip r flush cache

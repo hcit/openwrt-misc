@@ -1,0 +1,1 @@
+/usr/sbin/iptables -t mangle -I PREROUTING -j TOS --set-tos 0

@@ -1,0 +1,23 @@
+#!/bin/sh
+set > /tmp/udhcpc.log
+name=wan_ks
+rt=$name
+
+ifname=$(eval echo "\$CONFIG_${name}_ifname")
+
+ip r flush table $rt
+
+
+if [ "$router" -a "$router" != "0.0.0.0" -a "$ifname" = "$interface" ] ; then
+	ip r del default dev $ifname
+	ip r add $(ip r l | sed -n -e "/ $interface  / { s/proto.*src /src /; p; q}") table $rt
+	ip r add 0.0.0.0/0 via $router table $rt
+	pref=$(sed -n -e "/$rt/ { s/[[:space:]].*//; p; q;}" < /etc/iproute2/rt_tables)                                                                                                    
+	if [ "$pref" ]; then
+		ip rule del pref $pref
+		ip rule add from $ip pref $pref table $rt
+	fi
+	ip r add default via $router metric 10
+	ip r add default scope global nexthop dev pppoe-wan_utk weight 5 nexthop via $router dev $ifname weight 10
+fi
+ip r flush cache
