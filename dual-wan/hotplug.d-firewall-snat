@@ -11,5 +11,6 @@ if [ 'firewall' = $HOTPLUG_TYPE ]; then
 			remove) op=-D ;;
 		esac
 		iptables -t nat $op zone_${zone}_nat -o $DEVICE -j SNAT --to-source $ipaddr
+		iptables -t nat -D zone_${zone}_nat -j MASQUERADE
 	fi
 fi
