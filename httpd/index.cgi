@@ -1,21 +1,10 @@
 #!/bin/sh
+LIBPATH=$(dirname $SCRIPT_FILENAME)/lib
+INCLUDE_HTTPLIB=1
+. $LIBPATH/httplib.sh
+
 do_find () {
 	find . -maxdepth 1 -mindepth 1 -type $1 | sed -e 's@^./@@' | sort
-}
-
-fin () {
-	echo '</body></html>'
-	exit 0
-}
-
-header () {
-	echo -n "$1: "
-	shift
-	echo -e "$*\r"
-}
-
-urlencode () {
-	echo "$1" | sed -e "s/'/%27/g" -e "s/\?/%3f/g"
 }
 
 p_file () {
@@ -30,11 +19,7 @@ p_dir () {
 
 p_stat () {
 	b_free=$(stat -f -c "%a" "$home")
-#	b_total=$(stat -f -c "%b" "$home")
-#	f_total=$(stat -f -c "%c" "$home")
-#	f_free=$(stat -f -c "%d" "$home")
 	b_size=$(stat -f -c "%S" "$home")
-#	echo "<p>$((b_free*b_size/1024/1024)) / $((b_total*b_size/1024/1024)) MB free, &nbsp;&nbsp;&nbsp; $((f_total-f_free)) / $f_total files</p>"
 	echo "<p>$((b_free*b_size/1024/1024)) MB free</p>"
 }
 
