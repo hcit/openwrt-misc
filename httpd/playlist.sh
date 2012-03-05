@@ -12,7 +12,7 @@ header Content-Type "audio/x-mpegurl"
 header Content-Disposition "attachment; filename=playlist.m3u"
 header Date $(date -R)
 if [ ! -r $p_file ] || [ $(($(date +%s) - $(stat -c %Y $p_file))) -gt 86400 ]; then
-	wget -O - "$p_url" -o /dev/null | tr -d "\r" | sed -re "/^udp/ { s#://@#/#; s@^@$u_url@ }" > $p_file || echo > $p_file
+	wget -O - "$url" -o /dev/null | tr -d "\r" | sed -re "/^udp/ { s#://@#/#; s@^@$u_url@ }" > $p_file || echo > $p_file
 fi
 header Last-Modified $(date -r $p_file -R)
 header Status "200 OK"
