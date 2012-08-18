@@ -1,0 +1,136 @@
+#!/bin/sh
+# WAN interfaces must have "wan_" prefix, f.e. wan_isp1, wan_isp2
+# 
+# install it as /etc/hotplug.d/iface/90-routing
+# symlink it to /etc/hotplug.d/firewall/90-snat
+# 
+# in /etc/iproute2/rt_tables table id defines weight for load sharing:
+# 100 wan_isp1
+# 10 wan_isp2
+# means isp1 prodides 10 times more bandwidth then , isp2
+# metrices and rule priorities are calculated as inverse weights:
+# metric_isp1 = sum(all weights)-weight_isp1
+# 
+
+UBUS_PREFIX=network.interface
+NAME_PREFIX=wan_
+
+q() {
+	local tmpfile=$1
+	local name=$2
+	local start="$3"
+	local stop="$4"
+	[ "$start" -a "$stop" ] && range="/$start/,/$stop/" || range=""
+	sed -nre "$range { /\"$name\":/ { s/.* (\"?)([^\"]*[^,\"])[,\"]*$/\2/ ;p } }" $tmpfile	
+}
+
+if [ $HOTPLUG_TYPE = iface ]; then
+	[ "${INTERFACE:0:4}" != "$NAME_PREFIX" ] && exit 0
+
+	tmpdir=$(mktemp -d /tmp/ifupdown.XXXXXX)
+	cd $tmpdir || { logger "Cannot chdir to $tmpdir"; exit 1; }
+	trap "rm -rf $tmpdir" 0
+
+	ip="ip"
+
+	metric_table() {
+		eval $(
+			awk -v tgt=$1 '
+			$1 !~ /^#/ {
+				if ($2 ~ /^wan_/) {sum+=$1}
+				if ($2 == tgt) {table=$1}
+			}
+			END {
+				print "table=" table, "metric=" sum-table
+			} ' < /etc/iproute2/rt_tables
+		)	
+	}
+	
+	ifupdown() {
+		ubus call network.interface.$INTERFACE status > $INTERFACE
+		metric_table $INTERFACE
+		$ip r flush table $table
+		$ip rule del pref $metric
+		local l3_device=$(q $INTERFACE l3_device)
+		if [ "$l3_device" ]; then
+			ip r l | awk -v iface="dev $l3_device" '
+				function ifprint(s) {
+					print "iface:",iface
+					if ((s ~ iface)||((s ~ /default/)&&(s !~ /metric/)))
+						 print s
+				}
+				/^[[:space:]]/ { s=s $0; next }
+				/^[^[:space:]]/ { gsub(/\t/," ",s); ifprint(s); s=$0 }
+				END{ ifprint(s) }' \
+			| while read route; do
+				$ip r del $route
+			done
+		fi
+		local default=""
+		for i in  $(ubus list $UBUS_PREFIX.$NAME_PREFIX* | cut -f3 -d.); do
+			ubus call network.interface.$i status > $i
+			[ true != "$(q $i up)" ] && continue
+			local l3_device=$(q $i l3_device)
+			local address=$(q $i address)
+			local addr_mask=$(q $i mask '"ipv4-address"' '],')
+			local nexthop=$(q $i nexthop)
+			metric_table $i
+			[ "$table" ] || continue
+			local weight=$table
+			local pref=$metric
+			eval $(/bin/ipcalc.sh $nexthop/$addr_mask)
+			local p2p
+			[ $(( $(cat /sys/class/net/$l3_device/flags) & 0x10 )) -ne 0 ] && p2p=true || p2p=false
+			
+			local rt_connected="$NETWORK/$addr_mask dev $l3_device"
+			if $p2p; then
+				local rt_shared="dev $l3_device weight $weight"
+				local rt_exclusive="default dev $l3_device"
+			else
+				local rt_shared="via $nexthop dev $l3_device weight $weight"
+				local rt_exclusive="default via $nexthop dev $l3_device"
+			fi
+			if [ "$INTERFACE" = "$i" ]; then 
+				$ip r add $rt_connected
+				$ip r add $rt_exclusive metric $metric
+				$ip r add $rt_connected table $table
+				$ip r add $rt_exclusive table $table
+				$ip rule add from $address lookup $table pref $metric
+			fi
+			default="$default nexthop $rt_shared"
+		done
+		[ "$default" ] && $ip r add default $default
+	}
+	
+	case $ACTION in 
+		ifup|ifdown) ifupdown ;;
+	esac
+fi
+
+if [ $HOTPLUG_TYPE = firewall ]; then
+	. /lib/functions.sh
+	config_load firewall
+	cfg=$(set | egrep "cfg[0-9a-f]+_network=.*(('| )${INTERFACE}( |'))" | cut -f2 -d_)
+	if [ "$(uci get firewall.$cfg.masq)" = 1 ] ; then
+		zone=$(uci get firewall.${cfg}.name)
+		case "$ACTION" in
+			add)	
+				ipaddr=$(ubus call $UBUS_PREFIX.$INTERFACE status | q "" address) 
+				echo $ipaddr > /var/ipaddr.$INTERFACE
+				op=-I
+				;; 
+			remove)
+				read ipaddr < /var/ipaddr.$INTERFACE
+				op=-D
+				;;
+		esac
+		[ -z "$ipaddr" ] && exit 1
+		iptables -t nat $op zone_${zone}_nat -o $DEVICE -j SNAT --to-source $ipaddr
+		if [ "$ACTION" = "remove" ]; then
+			iptables -t nat -D zone_${zone}_nat -j MASQUERADE
+			for i in d q r s; do
+				conntrack -D -$i $ipaddr
+			done
+		fi
+	fi
+fi
