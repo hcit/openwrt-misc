@@ -1,4 +1,5 @@
 #!/bin/sh
+
 # WAN interfaces must have "wan_" prefix, f.e. wan_isp1, wan_isp2
 # 
 # install it as /etc/hotplug.d/iface/90-routing
@@ -7,7 +8,7 @@
 # in /etc/iproute2/rt_tables table id defines weight for load sharing:
 # 100 wan_isp1
 # 10 wan_isp2
-# means isp1 prodides 10 times more bandwidth then , isp2
+# means isp1 prodides 10 times more bandwidth than isp2
 # metrices and rule priorities are calculated as inverse weights:
 # metric_isp1 = sum(all weights)-weight_isp1
 # 
@@ -26,11 +27,9 @@ q() {
 
 if [ $HOTPLUG_TYPE = iface ]; then
 	[ "${INTERFACE:0:4}" != "$NAME_PREFIX" ] && exit 0
-
 	tmpdir=$(mktemp -d /tmp/ifupdown.XXXXXX)
 	cd $tmpdir || { logger "Cannot chdir to $tmpdir"; exit 1; }
 	trap "rm -rf $tmpdir" 0
-
 	ip="ip"
 
 	metric_table() {
@@ -51,16 +50,16 @@ if [ $HOTPLUG_TYPE = iface ]; then
 		metric_table $INTERFACE
 		$ip r flush table $table
 		$ip rule del pref $metric
-		local l3_device=$(q $INTERFACE l3_device)
-		if [ "$l3_device" ]; then
-			ip r l | awk -v iface="dev $l3_device" '
+		local device=$(q $INTERFACE l3_device)
+		device=${device:-$(q $INTERFACE device)}
+		if [ "$device" ]; then
+			ip r l | awk -v iface="dev $device" '
 				function ifprint(s) {
-					print "iface:",iface
 					if ((s ~ iface)||((s ~ /default/)&&(s !~ /metric/)))
 						 print s
 				}
 				/^[[:space:]]/ { s=s $0; next }
-				/^[^[:space:]]/ { gsub(/\t/," ",s); ifprint(s); s=$0 }
+				/^[^[:space:]]/ { gsub(/\t/," ",s); gsub(/dead/,"",s); ifprint(s); s=$0 }
 				END{ ifprint(s) }' \
 			| while read route; do
 				$ip r del $route
