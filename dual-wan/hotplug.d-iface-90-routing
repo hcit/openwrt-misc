@@ -8,8 +8,8 @@
 # in /etc/iproute2/rt_tables table id defines weight for load sharing:
 # 100 wan_isp1
 # 10 wan_isp2
-# means isp1 prodides 10 times more bandwidth than isp2
-# metrices and rule priorities are calculated as inverse weights:
+# means isp1 provides 10 times more bandwidth than isp2
+# metrics and rule priorities are calculated as inverse weights:
 # metric_isp1 = sum(all weights)-weight_isp1
 # 
 
