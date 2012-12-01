@@ -52,7 +52,8 @@ if [ $HOTPLUG_TYPE = iface ]; then
 		$ip rule del pref $metric
 		local device=$(q $INTERFACE l3_device)
 		device=${device:-$(q $INTERFACE device)}
-		if [ "$device" ]; then
+		local proto=$(q $INTERFACE proto)
+		if [ "$device" -a \( \( "${proto:0:2}" != "pp" -a "$proto" != "l2tp" \) -o "$ACTION" = "ifup" \) ]; then
 			ip r l | awk -v iface="dev $device" '
 				function ifprint(s) {
 					if ((s ~ iface)||((s ~ /default/)&&(s !~ /metric/)))
