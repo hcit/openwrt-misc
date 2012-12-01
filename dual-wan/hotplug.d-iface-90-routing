@@ -56,7 +56,7 @@ if [ $HOTPLUG_TYPE = iface ]; then
 		if [ "$device" -a \( \( "${proto:0:2}" != "pp" -a "$proto" != "l2tp" \) -o "$ACTION" = "ifup" \) ]; then
 			ip r l | awk -v iface="dev $device" '
 				function ifprint(s) {
-					if ((s ~ iface)||((s ~ /default/)&&(s !~ /metric/)))
+					if ((s ~ iface)||(s ~ /default/))
 						 print s
 				}
 				/^[[:space:]]/ { s=s $0; next }
@@ -92,7 +92,6 @@ if [ $HOTPLUG_TYPE = iface ]; then
 			fi
 			if [ "$INTERFACE" = "$i" ]; then 
 				$ip r add $rt_connected
-				$ip r add $rt_exclusive metric $metric
 				$ip r add $rt_connected table $table
 				$ip r add $rt_exclusive table $table
 				$ip rule add from $address lookup $table pref $metric
